@@ -157,19 +157,6 @@ void FAST_FUNC set_nport(struct sockaddr *sa, unsigned port)
 
 /* host: "1.2.3.4[:port]", "www.google.com[:port]"
  * port: if neither of above specifies port # */
-static len_and_sockaddr* str2sockaddr(
-		const char *host, int port,
-IF_FEATURE_IPV6(sa_family_t af,)
-		int ai_flags)
-{
-	return val_str2sockaddr(
-		*host, port,
-IF_FEATURE_IPV6(af,)
-		ai_flags, 0);
-}
-
-/* host: "1.2.3.4[:port]", "www.google.com[:port]"
- * port: if neither of above specifies port # */
 static len_and_sockaddr* val_str2sockaddr(
 		const char *host, int port,
 IF_FEATURE_IPV6(sa_family_t af,)
@@ -346,6 +333,20 @@ IF_NOT_FEATURE_IPV6(sa_family_t af = AF_INET;)
 #endif
 	return r;
 }
+
+/* host: "1.2.3.4[:port]", "www.google.com[:port]"
+ * port: if neither of above specifies port # */
+static len_and_sockaddr* str2sockaddr(
+		const char *host, int port,
+IF_FEATURE_IPV6(sa_family_t af,)
+		int ai_flags)
+{
+	return val_str2sockaddr(
+		*host, port,
+IF_FEATURE_IPV6(af,)
+		ai_flags, 0);
+}
+
 #if !ENABLE_FEATURE_IPV6
 #define str2sockaddr(host, port, af, ai_flags) str2sockaddr(host, port, ai_flags)
 #endif
