@@ -742,7 +742,7 @@ add_peers(const char *s)
 	peer_t *p;
 
 	p = xzalloc(sizeof(*p));
-	p->p_lsa = xhost2sockaddr(s, 123);
+	p->p_lsa = val_xhost2sockaddr(s, 123, VAL_QUERY_IGNORE_SKEW);
 	p->p_dotted = xmalloc_sockaddr2dotted_noport(&p->p_lsa->u.sa);
 	p->p_fd = -1;
 	p->p_xmt_msg.m_status = MODE_CLIENT | (NTP_VERSION << 3);

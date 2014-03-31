@@ -7,6 +7,14 @@ menu "Networking Utilities"
 
 INSERT
 
+config FEATURE_DNSSEC
+	bool "Enable DNSSEC support"
+	default y
+	help
+	  Enable DNSSEC support in busybox.
+	  This adds limited DNSSEC support in the networking applets (requires
+	  libval/libsres or other similar DNSSEC libraries).
+
 config FEATURE_IPV6
 	bool "Enable IPv6 support"
 	default y

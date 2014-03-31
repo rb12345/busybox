@@ -162,6 +162,19 @@ static len_and_sockaddr* str2sockaddr(
 IF_FEATURE_IPV6(sa_family_t af,)
 		int ai_flags)
 {
+	return val_str2sockaddr(
+		*host, port,
+IF_FEATURE_IPV6(af,)
+		ai_flags, 0);
+}
+
+/* host: "1.2.3.4[:port]", "www.google.com[:port]"
+ * port: if neither of above specifies port # */
+static len_and_sockaddr* val_str2sockaddr(
+		const char *host, int port,
+IF_FEATURE_IPV6(sa_family_t af,)
+		int ai_flags, unsigned int dnssec_flags)
+{
 IF_NOT_FEATURE_IPV6(sa_family_t af = AF_INET;)
 	int rc;
 	len_and_sockaddr *r;
@@ -170,6 +183,11 @@ IF_NOT_FEATURE_IPV6(sa_family_t af = AF_INET;)
 	const char *org_host = host; /* only for error msg */
 	const char *cp;
 	struct addrinfo hint;
+#if ENABLE_FEATURE_DNSSEC
+	char *dnssec_label = NULL;
+	val_context_t *ctx = NULL;
+	val_status_t dnssec_status;
+#endif
 
 	if (ENABLE_FEATURE_UNIX_LOCAL && strncmp(host, "local:", 6) == 0) {
 		struct sockaddr_un *sun;
@@ -261,13 +279,42 @@ IF_NOT_FEATURE_IPV6(sa_family_t af = AF_INET;)
 	 * for each possible socket type (tcp,udp,raw...): */
 	hint.ai_socktype = SOCK_STREAM;
 	hint.ai_flags = ai_flags & ~DIE_ON_ERROR;
+#if ENABLE_FEATURE_DNSSEC
+	rc = val_create_context(dnssec_label, &ctx);
+	if (rc || !ctx) {
+		/* Error handling here for non-zero return values or ctx=NULL */
+		bb_error_msg("Error generating DNSSEC context for host %s'", org_host);
+		if (ai_flags & DIE_ON_ERROR)
+			xfunc_die();
+		goto ret;
+	}
+	rc = val_context_setqflags(ctx, VAL_CTX_FLAG_SET, dnssec_flags);
+	if (rc) {
+		bb_error_msg("Error setting DNSSEC context flags %d", dnssec_flags);
+		if (ai_flags & DIE_ON_ERROR)
+			xfunc_die();
+		goto ret;
+	}
+	rc = val_getaddrinfo(ctx, host, NULL, &hint, &result, &dnssec_status);
+#else
 	rc = getaddrinfo(host, NULL, &hint, &result);
+#endif
 	if (rc || !result) {
 		bb_error_msg("bad address '%s'", org_host);
 		if (ai_flags & DIE_ON_ERROR)
 			xfunc_die();
 		goto ret;
 	}
+#if ENABLE_FEATURE_DNSSEC
+	if (!val_istrusted(dnssec_status)) {
+		/* Bad DNSSEC status, fail as if no results */
+		/* TODO: check whether p_val_status string needs freeing after use */
+		bb_error_msg("bogus dnssec result for '%s', status=%s", org_host, p_val_status(dnssec_status));
+		if (ai_flags & DIE_ON_ERROR)
+			xfunc_die();
+		goto ret;
+	}
+#endif
 	used_res = result;
 #if ENABLE_FEATURE_PREFER_IPV4_ADDRESS
 	while (1) {
@@ -288,7 +335,15 @@ IF_NOT_FEATURE_IPV6(sa_family_t af = AF_INET;)
 	set_nport(&r->u.sa, htons(port));
  ret:
 	if (result)
+#if ENABLE_FEATURE_DNSSEC
+		val_freeaddrinfo(result);
+#else
 		freeaddrinfo(result);
+#endif
+#if ENABLE_FEATURE_DNSSEC
+	if (ctx)
+		val_free_context(ctx);
+#endif
 	return r;
 }
 #if !ENABLE_FEATURE_IPV6
@@ -315,6 +370,11 @@ len_and_sockaddr* FAST_FUNC host2sockaddr(const char *host, int port)
 len_and_sockaddr* FAST_FUNC xhost2sockaddr(const char *host, int port)
 {
 	return str2sockaddr(host, port, AF_UNSPEC, DIE_ON_ERROR);
+}
+
+len_and_sockaddr* FAST_FUNC val_xhost2sockaddr(const char *host, int port, unsigned int dnssec_flags)
+{
+	return val_str2sockaddr(host, port, AF_UNSPEC, DIE_ON_ERROR, dnssec_flags);
 }
 
 len_and_sockaddr* FAST_FUNC xdotted2sockaddr(const char *host, int port)

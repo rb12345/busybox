@@ -123,6 +123,9 @@
    typedef unsigned socklen_t;
 # endif
 #endif
+#if ENABLE_FEATURE_DNSSEC
+# include <validator/validator.h>
+#endif
 #ifndef HAVE_CLEARENV
 # define clearenv() do { if (environ) environ[0] = NULL; } while (0)
 #endif
